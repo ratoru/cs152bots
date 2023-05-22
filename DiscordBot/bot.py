@@ -1,11 +1,15 @@
 # bot.py
 import discord
 from discord.ext import commands
+from discord import ui
 import os
 import json
 import logging
 import re
 from report import Report
+from review import Review
+from collections import defaultdict
+import heapq
 
 # Set up logging to the console
 logger = logging.getLogger("discord")
@@ -33,7 +37,10 @@ class ModBot(discord.Client):
         super().__init__(command_prefix=".", intents=intents)
         self.group_num = None
         self.mod_channels = {}  # Map from guild to the mod channel id for that guild
-        self.reports = {}  # Map from user IDs to the state of their report
+        self.unfinished_reports = {}  # Map from user IDs to the state of their report
+        self.unreviewed_reports = []  # Priority queue storing unreviewed reports
+        self.cur_review = None
+        self.strikes = defaultdict(int)  # Number of strikes per user
 
     async def on_ready(self):
         print(f"{self.user.name} has connected to Discord! It is these guilds:")
@@ -67,7 +74,11 @@ class ModBot(discord.Client):
 
         # Check if this message was sent in a server ("guild") or if it's a DM
         if message.guild:
-            await self.handle_channel_message(message)
+            if message.channel.name == f"group-{self.group_num}":
+                await self.handle_normal_channel_message(message)
+
+            if message.channel.name == f"group-{self.group_num}-mod":
+                await self.handle_mod_channel_message(message)
         else:
             await self.handle_dm(message)
 
@@ -83,58 +94,131 @@ class ModBot(discord.Client):
         responses = []
 
         # Only respond to messages if they're part of a reporting flow
-        if author_id not in self.reports and not message.content.startswith(
+        if author_id not in self.unfinished_reports and not message.content.startswith(
             Report.START_KEYWORD
         ):
             return
 
         # If we don't currently have an active report for this user, add one
-        if author_id not in self.reports:
-            self.reports[author_id] = Report(self)
+        if author_id not in self.unfinished_reports:
+            self.unfinished_reports[author_id] = Report(self)
 
         # Let the report class handle this message; forward all the messages it returns to us
-        responses = await self.reports[author_id].handle_message(message)
+        responses = await self.unfinished_reports[author_id].handle_message(message)
         for r in responses:
             if type(r) is tuple:
                 # Some responses might include a View.
                 await message.channel.send(r[0], view=r[1])
             else:
                 await message.channel.send(r)
-
         # If the report is complete or cancelled, remove it from our map
         # We do this here just in case the report is not completed by a View callback.
         # View callback's must call `clean_up_report` themselves.
         await self.clean_up_report(author_id)
 
     async def clean_up_report(self, author_id):
-        """If the report is complete or cancelled, remove it from our map."""
-        if author_id not in self.reports:
+        """
+        Performs all necessary steps before a user report is finished.
+        If the report is complete or cancelled, remove it from our map.
+        """
+        if author_id not in self.unfinished_reports:
             return
-        # Forward completed reports for review
-        if self.reports[author_id].report_complete():
-            # TODO: I'm sending completed report info to mod channel. Is that what we want?
-            cur_report = self.reports[author_id]
+        # Evaluate completed report and add to review queue
+        if self.unfinished_reports[author_id].report_complete():
+            score = 1  # TODO: replace with acutal score
+            cur_report = self.unfinished_reports[author_id]
+            self.push_report(score, cur_report)
             mod_channel = self.mod_channels[cur_report.message.guild.id]
-            await mod_channel.send(self.reports[author_id].report_info())
-        # Remove from internal map.
+            await mod_channel.send(
+                f"There are {len(self.unreviewed_reports)} reports outstanding."
+            )
+        # Remove report from internal map.
         if (
-            self.reports[author_id].report_canceled()
-            or self.reports[author_id].report_complete()
+            self.unfinished_reports[author_id].report_canceled()
+            or self.unfinished_reports[author_id].report_complete()
         ):
-            self.reports.pop(author_id)
+            self.unfinished_reports.pop(author_id)
 
-    async def handle_channel_message(self, message):
-        # Only handle messages sent in the "group-#" channel
-        if not message.channel.name == f"group-{self.group_num}":
-            return
-
+    async def handle_normal_channel_message(self, message):
         # Forward the message to the mod channel
+        # TODO: in the future we probably want to run our classifier and create reports for important cases.
         mod_channel = self.mod_channels[message.guild.id]
         await mod_channel.send(
             f'Forwarded message:\n{message.author.name}: "{message.content}"'
         )
         scores = self.eval_text(message.content)
         await mod_channel.send(self.code_format(scores))
+
+    async def handle_mod_channel_message(self, message):
+        # Handle a help message
+        if message.content == Review.HELP_KEYWORD:
+            reply = "Use the `review` command to begin the reviewing process.\n"
+            reply += "Use the `cancel` command to cancel the reviewing process.\n"
+            await message.channel.send(reply)
+            return
+
+        # Only respond to messages if they're part of a review flow
+        if self.cur_review is None and not message.content.startswith(
+            Review.START_KEYWORD
+        ):
+            return
+
+        # If we don't currently have a review, create one
+        if self.cur_review is None:
+            self.cur_review = Review(self)
+
+        # Let the review class handle this message; forward all the messages it returns to us
+        responses = await self.cur_review.handle_message(message)
+        for r in responses:
+            if type(r) is tuple:
+                # Some responses might include a View.
+                await message.channel.send(r[0], view=r[1])
+            else:
+                await message.channel.send(r)
+        # If the review is complete or cancelled, clean up resources
+        # We do this here just in case the report is not completed by a View callback.
+        # View callback's must call `clean_up_report` themselves.
+        await self.clean_up_review()
+
+    def pop_highest_priority_report(self):
+        """Pops unreviewed report with the highest priority."""
+        score_report = heapq.heappop(self.unreviewed_reports)
+        return (-score_report[0], score_report[1])
+
+    def pop_oldest_report(self):
+        """Pops oldest unreviewed report."""
+        oldest_i = 0
+        oldest_score = 0
+        oldest_report = self.unreviewed_reports[0]
+        for i, (score, report) in enumerate(self.unreviewed_reports):
+            if report.date_submitted < oldest_report[1].date_submitted:
+                oldest_i = i
+                oldest_score = score
+                oldest_report = report
+        del self.unreviewed_reports[oldest_i]
+        heapq.heapify(self.unreviewed_reports)
+        return (-oldest_score, oldest_report)
+
+    def push_report(self, score, report):
+        heapq.heappush(self.unreviewed_reports, (-score, report))
+
+    async def clean_up_review(self):
+        if self.cur_review is None:
+            return
+
+        if self.cur_review.review_canceled() and self.cur_review.report_popped():
+            # We need to put back the popped report
+            self.push_report(self.cur_review.score, self.cur_review.report)
+            self.cur_review = None
+
+        if self.cur_review.review_complete():
+            # TODO: perform banning actions
+            guild_id = self.cur_review.report.message.guild.id
+            mod_channel = self.mod_channels[guild_id]
+            await mod_channel.send(
+                f"Done. There are now {len(self.unreviewed_reports)} reports outstanding."
+            )
+            self.cur_review = None
 
     def eval_text(self, message):
         """'

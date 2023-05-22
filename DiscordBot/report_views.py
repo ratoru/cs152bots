@@ -208,7 +208,7 @@ class StartView(ui.View):
             await interaction.followup.send(
                 selection_msg
                 + "Would you like to submit your report or provide more information?",
-                view=MoreInfoView(self.report),
+                view=SubmitOrInfoView(self.report),
             )
         else:
             # Create next view

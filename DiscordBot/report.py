@@ -1,7 +1,7 @@
 from enum import Enum, auto
 import discord
 import re
-from user_report import (
+from report_views import (
     StartView,
     MoreInfoView,
     SUBMIT_MSG,
