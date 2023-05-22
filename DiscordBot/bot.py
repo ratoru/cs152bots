@@ -31,15 +31,18 @@ with open(token_path) as f:
 
 
 class ModBot(discord.Client):
+    STRIKE_LIMIT = 3
+
     def __init__(self):
         intents = discord.Intents.default()
         intents.message_content = True
         super().__init__(command_prefix=".", intents=intents)
         self.group_num = None
         self.mod_channels = {}  # Map from guild to the mod channel id for that guild
+        self.regular_channels = {}  # Map from guild to the regular channel id
         self.unfinished_reports = {}  # Map from user IDs to the state of their report
         self.unreviewed_reports = []  # Priority queue storing unreviewed reports
-        self.cur_review = None
+        self.cur_review = None  # Review in progress
         self.strikes = defaultdict(int)  # Number of strikes per user
 
     async def on_ready(self):
@@ -62,6 +65,8 @@ class ModBot(discord.Client):
             for channel in guild.text_channels:
                 if channel.name == f"group-{self.group_num}-mod":
                     self.mod_channels[guild.id] = channel
+                if channel.name == f"group-{self.group_num}":
+                    self.regular_channels[guild.id] = channel
 
     async def on_message(self, message):
         """
@@ -201,6 +206,58 @@ class ModBot(discord.Client):
     def push_report(self, score, report):
         heapq.heappush(self.unreviewed_reports, (-score, report))
 
+    async def enforce_strike(self, user) -> bool:
+        """
+        Adds a strike to the user's account.
+        If the user has STRIKE_LIMIT strikes, the user will be banned. Otherwise, the user will be suspended.
+        """
+        self.strikes[user.id] += 1
+        if self.strikes[user.id] >= self.STRIKE_LIMIT:
+            await self.ban_user(user)
+        else:
+            await self.suspend_user(user)
+
+    async def delete_messages(self, user):
+        """Deletes all messages from user `user_id`."""
+        channel = self.regular_channels[self.cur_review.report.message.guild.id]
+        mod_channel = self.mod_channels[self.cur_review.report.message.guild.id]
+        deleted = await channel.purge(
+            check=lambda m: m.author == user, reason="Account Banned"
+        )
+        await mod_channel.send(
+            f"{len(deleted)} messages from user {user.name} have been deleted."
+        )
+
+    async def ban_user(self, user):
+        # Explain violations and ban user
+        embed = discord.Embed(
+            title="Your account has been banned!",
+            description=self.cur_review.explain_review("ban"),
+            color=discord.Color.red(),
+            url="https://discord.com/guidelines",
+        )
+        embed.set_author(name="Community Moderators")
+        # Uncomment for testing purposes
+        # channel = self.regular_channels[self.cur_review.report.message.guild.id]
+        # await channel.send(embed=embed)
+        await user.send(embed=embed)
+        # Remove all their messages
+        await self.delete_messages(user)
+
+    async def suspend_user(self, user):
+        # Warn the user with explanation and suspend for 7 days
+        embed = discord.Embed(
+            title="Your account has been suspended for 7 days!",
+            description=self.cur_review.explain_review("suspend"),
+            color=discord.Color.orange(),
+            url="https://discord.com/guidelines",
+        )
+        embed.set_author(name="Community Moderators")
+        # Uncomment for testing purposes
+        # channel = self.regular_channels[self.cur_review.report.message.guild.id]
+        # await channel.send(embed=embed)
+        await user.send(embed=embed)
+
     async def clean_up_review(self):
         if self.cur_review is None:
             return
@@ -211,11 +268,10 @@ class ModBot(discord.Client):
             self.cur_review = None
 
         if self.cur_review.review_complete():
-            # TODO: perform banning actions
             guild_id = self.cur_review.report.message.guild.id
             mod_channel = self.mod_channels[guild_id]
             await mod_channel.send(
-                f"Done. There are now {len(self.unreviewed_reports)} reports outstanding."
+                f"Review completed. Necessary actions have been taken.\n\nThere are now {len(self.unreviewed_reports)} reports outstanding."
             )
             self.cur_review = None
 

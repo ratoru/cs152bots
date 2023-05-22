@@ -1,12 +1,10 @@
 from enum import Enum, auto
 import discord
-import re
 from review_views import ReviewStart
 
 
 class State(Enum):
     REVIEW_START = auto()
-    AWAITING_REPORT = auto()
     IN_VIEW = auto()
     REVIEW_CANCELED = auto()
     REVIEW_COMPLETE = auto()
@@ -58,6 +56,15 @@ class Review:
 
     def report_popped(self):
         return self.report is not None
+
+    def explain_review(self, action: str):
+        """Explains why action against the user has been taken."""
+        # TODO: better explanation
+        return (
+            "Your recent messages have violated our Community Guidelines.\n"
+            + f"We do not tolerate this behavior, so we were forced to {action} your account.\n"
+            + "Refer to the linked Community Guidelines for more information."
+        )
 
     async def finish_review(self):
         """Finishes the report by setting the type to complete and calling the client's clean up funciton."""

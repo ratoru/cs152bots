@@ -9,7 +9,7 @@ def create_embed(report):
         description=report.report_info(),
         color=discord.Color.yellow(),
     )
-    embed.set_author(name=f"User #{report.author_id}")
+    embed.set_author(name=f"User {report.author.name}")
     return embed
 
 
@@ -33,6 +33,28 @@ class ButtonView(ui.View):
             button.style = discord.ButtonStyle.grey
 
 
+class MassReportingView(ButtonView):
+    """View to handle whether this is a case of mass adversarial reporting."""
+
+    @discord.ui.button(label="No", style=discord.ButtonStyle.primary)
+    async def risk_callback(self, interaction: discord.Interaction, button):
+        await self.change_buttons(interaction, button)
+        # The author of the report should get punished
+        bully = self.review.report.author
+        await self.review.client.enforce_strike(bully)
+        await self.review.finish_review()
+
+    @discord.ui.button(label="Yes", style=discord.ButtonStyle.secondary)
+    async def no_risk_callback(self, interaction: discord.Interaction, button):
+        await self.change_buttons(interaction, button)
+        # TODO: make this automatic
+        await interaction.followup.send("Please report other involved users as well.")
+        # The author of the report should get punished
+        bully = self.review.report.author
+        await self.review.client.enforce_strike(bully)
+        await self.review.finish_review()
+
+
 class AdversarialView(ButtonView):
     """View to handle whether report is adversarial."""
 
@@ -44,7 +66,10 @@ class AdversarialView(ButtonView):
     @discord.ui.button(label="Yes", style=discord.ButtonStyle.secondary)
     async def no_risk_callback(self, interaction: discord.Interaction, button):
         await self.change_buttons(interaction, button)
-        # TODO: consequences
+        await interaction.followup.send(
+            "Does this appear to be a coordinated mass reporting in order to harass/bully a user?",
+            view=MassReportingView(self.review),
+        )
 
 
 class AdversarialFlaggedView(ButtonView):
@@ -70,13 +95,16 @@ class TypeOfViolationView(ButtonView):
     @discord.ui.button(label="Yes", style=discord.ButtonStyle.primary)
     async def risk_callback(self, interaction: discord.Interaction, button):
         await self.change_buttons(interaction, button)
-        # TODO: consequences
+        bully = self.review.report.message.author
+        await self.review.client.ban_user(bully)
+        await self.review.finish_review()
 
     @discord.ui.button(label="No", style=discord.ButtonStyle.secondary)
     async def no_risk_callback(self, interaction: discord.Interaction, button):
         await self.change_buttons(interaction, button)
-        # TODO: add strike and check strikes
-        # TODO: consequences
+        bully = self.review.report.message.author
+        await self.review.client.enforce_strike(bully)
+        await self.review.finish_review()
 
 
 class IsRiskView(ButtonView):
@@ -86,9 +114,12 @@ class IsRiskView(ButtonView):
     async def risk_callback(self, interaction: discord.Interaction, button):
         await self.change_buttons(interaction, button)
         await interaction.followup.send(
-            "Please write a report and forward relevant information to law enforcement."
+            "Please write a report and forward relevant information to law enforcement.\n"
+            + "I will ban the user for you."
         )
-        # TODO: consequences
+        bully = self.review.report.message.author
+        await self.review.client.ban_user(bully)
+        await self.review.finish_review()
 
     @discord.ui.button(label="No", style=discord.ButtonStyle.secondary)
     async def no_risk_callback(self, interaction: discord.Interaction, button):

@@ -33,7 +33,7 @@ class Report:
         # The ModBot
         self.client = client
         # State for filing a report
-        self.author_id: int = None  # Author of the report
+        self.author = None  # Author of the report
         self.message = None  # Reported message
         self.abuse_type: ABUSE_TYPES = None
         self.harassment_types: List[HARASSMENT_TYPES] = []
@@ -59,7 +59,7 @@ class Report:
             reply += "Please copy paste the link to the message you want to report.\n"
             reply += "You can obtain this link by right-clicking the message and clicking `Copy Message Link`."
             self.state = State.AWAITING_MESSAGE
-            self.author_id = message.author.id
+            self.author = message.author
             return [reply]
 
         if self.state == State.AWAITING_MESSAGE:
@@ -151,13 +151,13 @@ class Report:
 
     def report_info(self):
         """Info provided to the moderators for review."""
-        return f"User #{self.author_id} reported the following message on {self.date_submitted}:\n```{self.message.author.name}: {self.message.content}```\nAbuse Type: {self.abuse_type}\nHarassment Types: {self.harassment_types}\nTarget: {self.target} \nAdditional Msgs: {self.additional_msgs}\nAdditional Info {self.additional_info}"
+        return f"User {self.author.name} reported the following message on {self.date_submitted}:\n```{self.message.author.name}: {self.message.content}```\nAbuse Type: {self.abuse_type}\nHarassment Types: {self.harassment_types}\nTarget: {self.target} \nAdditional Msgs: {self.additional_msgs}\nAdditional Info {self.additional_info}"
 
     async def finish_report(self):
         """Finishes the report by setting the type to complete and calling the client's clean up funciton."""
         self.state = State.REPORT_COMPLETE
         self.date_submitted = date.today()
-        await self.client.clean_up_report(self.author_id)
+        await self.client.clean_up_report(self.author.id)
 
     # State setters and getters
     def set_info_state(self):
