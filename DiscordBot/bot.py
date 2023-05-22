@@ -188,10 +188,9 @@ class ModBot(discord.Client):
     def pop_oldest_report(self):
         """Pops oldest unreviewed report."""
         oldest_i = 0
-        oldest_score = 0
-        oldest_report = self.unreviewed_reports[0]
+        (oldest_score, oldest_report) = self.unreviewed_reports[0]
         for i, (score, report) in enumerate(self.unreviewed_reports):
-            if report.date_submitted < oldest_report[1].date_submitted:
+            if report.date_submitted < oldest_report.date_submitted:
                 oldest_i = i
                 oldest_score = score
                 oldest_report = report
