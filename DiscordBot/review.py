@@ -59,9 +59,10 @@ class Review:
 
     def explain_review(self, action: str):
         """Explains why action against the user has been taken."""
-        # TODO: better explanation
+        # TODO: better explanation, e.g. adversarial reporting
         return (
-            "Your recent messages have violated our Community Guidelines.\n"
+            "Your recent messages have violated our Community Guidelines:\n"
+            + f"```{self.report.message.content}```"
             + f"We do not tolerate this behavior, so we were forced to {action} your account.\n"
             + "Refer to the linked Community Guidelines for more information."
         )

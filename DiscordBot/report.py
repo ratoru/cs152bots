@@ -39,7 +39,7 @@ class Report:
         self.harassment_types: List[HARASSMENT_TYPES] = []
         self.target = None  # TODO: Still has to change
         self.date_submitted = None
-        self.additional_msgs: List[str] = None
+        self.additional_msgs: List[str] = []
         self.additional_info: Optional[str] = None
 
     async def handle_message(self, message):
@@ -132,6 +132,7 @@ class Report:
 
         if self.state == State.GETTING_EXTRA_INFO:
             self.additional_info = message.content
+            self.date_submitted = date.today()
             self.state = State.REPORT_COMPLETE
             return [SUBMIT_MSG]
 
@@ -174,3 +175,12 @@ class Report:
 
     def set_target(self, target):
         self.target = target
+
+    # Sorting functions for the class
+    def _is_valid_operand(self, other):
+        return hasattr(other, "date_submitted")
+
+    def __lt__(self, other):
+        if not self._is_valid_operand(other):
+            return NotImplemented
+        return self.date_submitted < other.date_submitted

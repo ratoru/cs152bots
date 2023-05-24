@@ -47,7 +47,7 @@ class MassReportingView(ButtonView):
     @discord.ui.button(label="Yes", style=discord.ButtonStyle.secondary)
     async def no_risk_callback(self, interaction: discord.Interaction, button):
         await self.change_buttons(interaction, button)
-        # TODO: make this automatic
+        # TODO: make this automatic or give user option
         await interaction.followup.send("Please report other involved users as well.")
         # The author of the report should get punished
         bully = self.review.report.author
@@ -114,8 +114,8 @@ class IsRiskView(ButtonView):
     async def risk_callback(self, interaction: discord.Interaction, button):
         await self.change_buttons(interaction, button)
         await interaction.followup.send(
-            "Please write a report and forward relevant information to law enforcement.\n"
-            + "I will ban the user for you."
+            "Please write a report to forward relevant information to law enforcement, seperately.\n"
+            + "For now, I will ban the user for you."
         )
         bully = self.review.report.message.author
         await self.review.client.ban_user(bully)
