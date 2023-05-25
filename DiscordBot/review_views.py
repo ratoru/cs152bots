@@ -118,7 +118,7 @@ class IsRiskView(ButtonView):
         await self.change_buttons(interaction, button)
         await interaction.followup.send(
             "Please write a report to forward relevant information to law enforcement, seperately.\n"
-            + "For now, I will ban the user for you."
+            + "For now, I will ban the user for you..."
         )
         bully = self.review.report.message.author
         await self.review.client.ban_user(bully)

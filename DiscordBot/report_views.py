@@ -21,7 +21,6 @@ HARASSMENT_TYPES = [
     "Blackmailing",
     "Other",
 ]
-SUBMIT_MSG = "Thank you for reporting. We take your report very seriously. Our content moderation team will review your report. Further action might include temporary or permanent account suspension."
 
 
 class ButtonView(ui.View):
@@ -50,7 +49,7 @@ class AnythingElse(ButtonView):
     @discord.ui.button(label="Submit", style=discord.ButtonStyle.primary)
     async def submit_callback(self, interaction, button):
         await self.change_buttons(interaction, button)
-        await interaction.followup.send(SUBMIT_MSG)
+        await interaction.followup.send(embed=self.report.create_submit_embed())
         await self.report.finish_report()
 
     @discord.ui.button(label="Add description", style=discord.ButtonStyle.secondary)
@@ -66,7 +65,7 @@ class MoreInfoView(ButtonView):
     """View to handle if you'd like to provide extra message IDs."""
 
     @discord.ui.button(label="No", style=discord.ButtonStyle.primary)
-    async def submit_callback(self, interaction, button):
+    async def submit_callback(self, interaction: discord.Interaction, button):
         await self.change_buttons(interaction, button)
         await interaction.followup.send(
             "Is there anything else you would like the moderators to know?\nIf not, your report will be submitted.",
@@ -74,23 +73,25 @@ class MoreInfoView(ButtonView):
         )
 
     @discord.ui.button(label="Yes", style=discord.ButtonStyle.secondary)
-    async def more_button_callback(self, interaction, button):
+    async def more_button_callback(self, interaction: discord.Interaction, button):
         await self.change_buttons(interaction, button)
         self.report.set_msg_id_state()
-        await interaction.followup.send("Please provide the message ID.")
+        await interaction.followup.send(
+            "Please copy paste the link to the message you want to report.\nYou can obtain this link by right-clicking the message and clicking Copy Message Link."
+        )
 
 
 class SubmitOrInfoView(ButtonView):
     """View to handle earliest submission."""
 
     @discord.ui.button(label="Submit", style=discord.ButtonStyle.primary)
-    async def submit_callback(self, interaction, button):
+    async def submit_callback(self, interaction: discord.Interaction, button):
         await self.change_buttons(interaction, button)
-        await interaction.followup.send(SUBMIT_MSG)
+        await interaction.followup.send(embed=self.report.create_submit_embed())
         await self.report.finish_report()
 
     @discord.ui.button(label="More Info", style=discord.ButtonStyle.secondary)
-    async def more_button_callback(self, interaction, button):
+    async def more_button_callback(self, interaction: discord.Interaction, button):
         await self.change_buttons(interaction, button)
         await interaction.followup.send(
             "Sure. Is there another message you would like to add to this report?",
@@ -110,7 +111,7 @@ class HarassmentTypesView(ui.View):
         options=[discord.SelectOption(label=h) for h in HARASSMENT_TYPES],
         max_values=len(HARASSMENT_TYPES),
     )
-    async def select_callback(self, interaction, select):
+    async def select_callback(self, interaction: discord.Interaction, select):
         self.report.set_harassment_types(select.values)
 
         # Disable Selection
@@ -137,7 +138,7 @@ class OtherVictimView(ui.View):
 
     # TODO: only let's you select yourself and bot rn because it's a personal DM between reporter and bot.
     @discord.ui.select(cls=ui.UserSelect, placeholder="Please select the user...")
-    async def select_callback(self, interaction, select):
+    async def select_callback(self, interaction: discord.Interaction, select):
         self.report.set_target(select.values[0].name)
         # Disable Selection
         select.disabled = True
@@ -192,7 +193,7 @@ class StartView(ui.View):
         placeholder="Select abuse type...",
         options=[discord.SelectOption(label=abuse) for abuse in ABUSE_TYPES],
     )
-    async def select_callback(self, interaction, select):
+    async def select_callback(self, interaction: discord.Interaction, select):
         self.report.set_abuse_type(select.values[0])
 
         # Disable Selection

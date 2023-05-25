@@ -275,9 +275,12 @@ class ModBot(discord.Client):
         if self.cur_review.review_complete():
             guild_id = self.cur_review.report.message.guild.id
             mod_channel = self.mod_channels[guild_id]
-            await mod_channel.send(
-                f"Review completed. Necessary actions have been taken.\n\nThere are now {len(self.unreviewed_reports)} reports outstanding."
+            embed = discord.Embed(
+                title="Review completed!",
+                description=f"Thank you for reviewing this report. Necessary actions have been taken.\nThere are now {len(self.unreviewed_reports)} reports outstanding.",
+                color=discord.Color.green(),
             )
+            await mod_channel.send(embed=embed)
             self.cur_review = None
 
     def eval_text(self, message):

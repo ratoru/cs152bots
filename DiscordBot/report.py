@@ -145,7 +145,7 @@ class Report:
 
     def report_info(self):
         """Info provided to the moderators for review."""
-        return f"User {self.author.name} reported the following message on {self.date_submitted}:\n```{self.message.author.name}: {self.message.content}```\nAbuse Type: {self.abuse_type}\nHarassment Types: {self.harassment_types}\nTarget of the abuse: {self.target} \nAdditional Msgs: {self.format_extra_msgs()}\nAdditional Info {self.additional_info}"
+        return f"User {self.author.name} reported the following message on {self.date_submitted}:\n```{self.message.author.name}: {self.message.content}```\nAbuse Type: {self.abuse_type}\nHarassment Types: {self.harassment_types}\nTarget of the abuse: {self.target} \nAdditional Msgs: {self.format_extra_msgs()}\nAdditional Info: {self.additional_info}"
 
     async def finish_report(self):
         """Finishes the report by setting the type to complete and calling the client's clean up funciton."""
