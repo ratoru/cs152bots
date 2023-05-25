@@ -47,7 +47,6 @@ class MassReportingView(ButtonView):
     @discord.ui.button(label="Yes", style=discord.ButtonStyle.secondary)
     async def no_risk_callback(self, interaction: discord.Interaction, button):
         await self.change_buttons(interaction, button)
-        # TODO: make this automatic or give reviewer option
         await interaction.followup.send(
             "Please file separate reports for other involved users as well."
         )

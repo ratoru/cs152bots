@@ -38,7 +38,7 @@ class Report:
         self.message: discord.Message = None  # Reported message
         self.abuse_type: ABUSE_TYPES = None
         self.harassment_types: List[HARASSMENT_TYPES] = []
-        self.target = None  # Target of the abuse
+        self.target = ""  # Target of the abuse
         self.date_submitted = None
         self.additional_msgs: List[discord.Message] = []
         self.additional_info: Optional[str] = None

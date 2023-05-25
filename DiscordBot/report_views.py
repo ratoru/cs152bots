@@ -129,28 +129,34 @@ class HarassmentTypesView(ui.View):
         )
 
 
-class OtherVictimView(ui.View):
-    """View to handle selection of other person being harassed."""
+class OtherVictimSelect(ui.Select):
+    """Select (NOT View!) to handle selection of other person being harassed."""
 
     def __init__(self, report):
-        super().__init__()
+        super().__init__(
+            placeholder="Please select the user...",
+            options=[
+                discord.SelectOption(label=member.name)
+                for member in report.message.channel.members
+            ],
+        )
         self.report = report
 
-    # TODO: only let's you select yourself and bot rn because it's a personal DM between reporter and bot.
-    @discord.ui.select(cls=ui.UserSelect, placeholder="Please select the user...")
-    async def select_callback(self, interaction: discord.Interaction, select):
-        self.report.set_target(select.values[0].name)
+    async def callback(self, interaction: discord.Interaction):
+        self.report.set_target(self.values[0])
         # Disable Selection
-        select.disabled = True
-        select.placeholder = select.values[0].name
-        await interaction.response.edit_message(view=self)
+        self.disabled = True
+        self.placeholder = self.values[0]
+        new_view = ui.View()
+        new_view.add_item(self)
+        await interaction.response.edit_message(view=new_view)
 
         # Create harassment type selection view
-        selection_msg = "You selected " + select.values[0].name + ".\n\n"
+        selection_msg = "You selected " + self.values[0] + ".\n\n"
         await interaction.followup.send(
             selection_msg
             + "What kinds of harassment did "
-            + select.values[0].name
+            + self.values[0]
             + " experience? Select all that apply.",
             view=HarassmentTypesView(self.report),
         )
@@ -171,9 +177,12 @@ class VictimView(ButtonView):
     @discord.ui.button(label="Someone Else", style=discord.ButtonStyle.secondary)
     async def other_button_callback(self, interaction, button):
         await self.change_buttons(interaction, button)
+        select = OtherVictimSelect(self.report)
+        view = ui.View()
+        view.add_item(select)
         await interaction.followup.send(
             "You selected 'Someone Else'.\n\nWho is being bullied?",
-            view=OtherVictimView(self.report),
+            view=view,
         )
 
 
