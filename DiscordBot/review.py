@@ -1,6 +1,6 @@
 from enum import Enum, auto
-import discord
 from review_views import ReviewStart
+from typing import Literal
 
 
 class State(Enum):
@@ -20,6 +20,7 @@ class Review:
         self.client = client  # the bot
         self.score = -1
         self.report = None
+        self.adversarial = False
 
     async def handle_message(self, message):
         """
@@ -57,14 +58,25 @@ class Review:
     def report_popped(self):
         return self.report is not None
 
-    def explain_review(self, action: str):
+    def explain_review(self, action: Literal["suspend", "ban"]):
         """Explains why action against the user has been taken."""
-        # TODO: better explanation, e.g. adversarial reporting
+        ban_msg = "Refer to the linked Community Guidelines for more information."
+        if action == "suspend":
+            ban_msg = (
+                "After two suspension any further violations will get your account banned.\n"
+                + ban_msg
+            )
+        if self.adversarial:
+            return (
+                "You have violated our Community Guidelines by targeting a user with wrong reports.\n"
+                + f"We do not tolerate this behavior, so we were forced to {action} your account.\n"
+                + ban_msg
+            )
         return (
             "Your recent messages have violated our Community Guidelines:\n"
             + f"```{self.report.message.content}```"
             + f"We do not tolerate this behavior, so we were forced to {action} your account.\n"
-            + "Refer to the linked Community Guidelines for more information."
+            + ban_msg
         )
 
     async def finish_review(self):
@@ -78,3 +90,6 @@ class Review:
 
     def set_score(self, score):
         self.score = score
+
+    def set_adversarial(self):
+        self.adversarial = True

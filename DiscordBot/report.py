@@ -4,11 +4,10 @@ import re
 from report_views import (
     StartView,
     MoreInfoView,
-    SUBMIT_MSG,
     ABUSE_TYPES,
     HARASSMENT_TYPES,
 )
-from typing import Optional, List
+from typing import Optional, List, Union
 from datetime import date
 
 
@@ -27,6 +26,8 @@ class Report:
     CANCEL_KEYWORD = "cancel"
     HELP_KEYWORD = "help"
 
+    SUBMIT_MSG = "Thank you for reporting. We take your report very seriously. Our content moderation team will review your report. Further action might include temporary or permanent account suspension."
+
     def __init__(self, client):
         # State to handle inner working of bot
         self.state = State.REPORT_START
@@ -34,12 +35,12 @@ class Report:
         self.client = client
         # State for filing a report
         self.author = None  # Author of the report
-        self.message = None  # Reported message
+        self.message: discord.Message = None  # Reported message
         self.abuse_type: ABUSE_TYPES = None
         self.harassment_types: List[HARASSMENT_TYPES] = []
-        self.target = None  # TODO: Still has to change
+        self.target = None  # Target of the abuse
         self.date_submitted = None
-        self.additional_msgs: List[str] = []
+        self.additional_msgs: List[discord.Message] = []
         self.additional_info: Optional[str] = None
 
     async def handle_message(self, message):
@@ -63,67 +64,28 @@ class Report:
             return [reply]
 
         if self.state == State.AWAITING_MESSAGE:
-            # Parse out the three ID strings from the message link
-            m = re.search("/(\d+)/(\d+)/(\d+)", message.content)
-            if not m:
-                return [
-                    "I'm sorry, I couldn't read that link. Please try again or say `cancel` to cancel."
-                ]
-            guild = self.client.get_guild(int(m.group(1)))
-            if not guild:
-                return [
-                    "I cannot accept reports of messages from guilds that I'm not in. Please have the guild owner add me to the guild and try again."
-                ]
-            channel = guild.get_channel(int(m.group(2)))
-            if not channel:
-                return [
-                    "It seems this channel was deleted or never existed. Please try again or say `cancel` to cancel."
-                ]
-            try:
-                message = await channel.fetch_message(int(m.group(3)))
-            except discord.errors.NotFound:
-                return [
-                    "It seems this message was deleted or never existed. Please try again or say `cancel` to cancel."
-                ]
+            msg = await self.parse_msg(message)
+            if type(msg) == str:
+                return [msg]
 
-            # Here we've found the message - it's up to you to decide what to do next!
+            # Here we've found the message - let's enter our View flow.
             self.state = State.IN_VIEW
-            self.message = message
+            self.message = msg
             return [
                 "I found this message:",
-                "```" + message.author.name + ": " + message.content + "```",
+                "```" + msg.author.name + ": " + msg.content + "```",
                 ("Why would you like to report this message?", StartView(report=self)),
             ]
 
         if self.state == State.GETTING_MSG_ID:
-            # TODO: refactor
-            # Parse out the three ID strings from the message link
-            m = re.search("/(\d+)/(\d+)/(\d+)", message.content)
-            if not m:
-                return [
-                    "I'm sorry, I couldn't read that link. Please try again or say `cancel` to cancel."
-                ]
-            guild = self.client.get_guild(int(m.group(1)))
-            if not guild:
-                return [
-                    "I cannot accept reports of messages from guilds that I'm not in. Please have the guild owner add me to the guild and try again."
-                ]
-            channel = guild.get_channel(int(m.group(2)))
-            if not channel:
-                return [
-                    "It seems this channel was deleted or never existed. Please try again or say `cancel` to cancel."
-                ]
-            try:
-                message = await channel.fetch_message(int(m.group(3)))
-            except discord.errors.NotFound:
-                return [
-                    "It seems this message was deleted or never existed. Please try again or say `cancel` to cancel."
-                ]
-            self.additional_msgs.append(message)
+            msg = await self.parse_msg(message)
+            if type(msg) == str:
+                return [msg]
+            self.additional_msgs.append(msg)
             self.state = State.IN_VIEW
             return [
                 "I found this message to add to the report:",
-                "```" + message.author.name + ": " + message.content + "```",
+                "```" + msg.author.name + ": " + msg.content + "```",
                 (
                     "Is there another message you would like to add to this report?",
                     MoreInfoView(report=self),
@@ -134,7 +96,7 @@ class Report:
             self.additional_info = message.content
             self.date_submitted = date.today()
             self.state = State.REPORT_COMPLETE
-            return [SUBMIT_MSG]
+            return [("", self.create_submit_embed())]
 
         if self.state == State.IN_VIEW:
             # If there is a view, the view should be interacted with.
@@ -144,15 +106,46 @@ class Report:
 
         return []
 
+    async def parse_msg(self, message: discord.Message) -> Union[discord.Message, str]:
+        """Takes a message link and returns the message object or an error."""
+        # Parse out the three ID strings from the message link
+        m = re.search("/(\d+)/(\d+)/(\d+)", message.content)
+        if not m:
+            return "I'm sorry, I couldn't read that link. Please try again or say `cancel` to cancel."
+        guild = self.client.get_guild(int(m.group(1)))
+        if not guild:
+            return "I cannot accept reports of messages from guilds that I'm not in. Please have the guild owner add me to the guild and try again."
+        channel = guild.get_channel(int(m.group(2)))
+        if not channel:
+            return "It seems this channel was deleted or never existed. Please try again or say `cancel` to cancel."
+        try:
+            message = await channel.fetch_message(int(m.group(3)))
+        except discord.errors.NotFound:
+            return "It seems this message was deleted or never existed. Please try again or say `cancel` to cancel."
+        return message
+
     def report_canceled(self):
         return self.state == State.REPORT_CANCELED
 
     def report_complete(self):
         return self.state == State.REPORT_COMPLETE
 
+    def create_submit_embed(self):
+        """Creates an embed for report submission."""
+        embed = discord.Embed(
+            title="We received your report!",
+            description=self.SUBMIT_MSG,
+            color=discord.Color.green(),
+        )
+        embed.set_author(name="Community Moderators")
+        return embed
+
+    def format_extra_msgs(self):
+        return ", ".join([f"`{msg.content}`" for msg in self.additional_msgs])
+
     def report_info(self):
         """Info provided to the moderators for review."""
-        return f"User {self.author.name} reported the following message on {self.date_submitted}:\n```{self.message.author.name}: {self.message.content}```\nAbuse Type: {self.abuse_type}\nHarassment Types: {self.harassment_types}\nTarget: {self.target} \nAdditional Msgs: {self.additional_msgs}\nAdditional Info {self.additional_info}"
+        return f"User {self.author.name} reported the following message on {self.date_submitted}:\n```{self.message.author.name}: {self.message.content}```\nAbuse Type: {self.abuse_type}\nHarassment Types: {self.harassment_types}\nTarget of the abuse: {self.target} \nAdditional Msgs: {self.format_extra_msgs()}\nAdditional Info {self.additional_info}"
 
     async def finish_report(self):
         """Finishes the report by setting the type to complete and calling the client's clean up funciton."""

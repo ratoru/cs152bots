@@ -112,8 +112,12 @@ class ModBot(discord.Client):
         responses = await self.unfinished_reports[author_id].handle_message(message)
         for r in responses:
             if type(r) is tuple:
-                # Some responses might include a View.
-                await message.channel.send(r[0], view=r[1])
+                if type(r[1]) is discord.Embed:
+                    # Some responses might include an Embed.
+                    await message.channel.send(embed=r[1])
+                else:
+                    # Some responses might include a View.
+                    await message.channel.send(r[0], view=r[1])
             else:
                 await message.channel.send(r)
         # If the report is complete or cancelled, remove it from our map
@@ -130,7 +134,7 @@ class ModBot(discord.Client):
             return
         # Evaluate completed report and add to review queue
         if self.unfinished_reports[author_id].report_complete():
-            score = 1  # TODO: replace with acutal score
+            score = 1  # TODO: replace with acutal score in Milestone 3
             cur_report = self.unfinished_reports[author_id]
             self.push_report(score, cur_report)
             mod_channel = self.mod_channels[cur_report.message.guild.id]
@@ -146,7 +150,7 @@ class ModBot(discord.Client):
 
     async def handle_normal_channel_message(self, message):
         # Forward the message to the mod channel
-        # TODO: in the future we probably want to run our classifier and create reports for important cases.
+        # TODO: Milestone 3 we probably want to run our classifier and create reports for important cases.
         mod_channel = self.mod_channels[message.guild.id]
         await mod_channel.send(
             f'Forwarded message:\n{message.author.name}: "{message.content}"'
@@ -266,6 +270,7 @@ class ModBot(discord.Client):
             # We need to put back the popped report
             self.push_report(self.cur_review.score, self.cur_review.report)
             self.cur_review = None
+            return
 
         if self.cur_review.review_complete():
             guild_id = self.cur_review.report.message.guild.id

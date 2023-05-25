@@ -5,11 +5,11 @@ from discord import ui
 def create_embed(report):
     """Creates an embed containging the passed in report."""
     embed = discord.Embed(
-        title=f"Report against {report.target}",
+        title=f"Report against {report.message.author}",
         description=report.report_info(),
         color=discord.Color.yellow(),
     )
-    embed.set_author(name=f"User {report.author.name}")
+    embed.set_author(name=f"Reported by {report.author.name}")
     return embed
 
 
@@ -47,8 +47,10 @@ class MassReportingView(ButtonView):
     @discord.ui.button(label="Yes", style=discord.ButtonStyle.secondary)
     async def no_risk_callback(self, interaction: discord.Interaction, button):
         await self.change_buttons(interaction, button)
-        # TODO: make this automatic or give user option
-        await interaction.followup.send("Please report other involved users as well.")
+        # TODO: make this automatic or give reviewer option
+        await interaction.followup.send(
+            "Please file separate reports for other involved users as well."
+        )
         # The author of the report should get punished
         bully = self.review.report.author
         await self.review.client.enforce_strike(bully)
@@ -66,6 +68,7 @@ class AdversarialView(ButtonView):
     @discord.ui.button(label="Yes", style=discord.ButtonStyle.secondary)
     async def no_risk_callback(self, interaction: discord.Interaction, button):
         await self.change_buttons(interaction, button)
+        self.review.set_adversarial()
         await interaction.followup.send(
             "Does this appear to be a coordinated mass reporting in order to harass/bully a user?",
             view=MassReportingView(self.review),
@@ -73,7 +76,7 @@ class AdversarialView(ButtonView):
 
 
 class AdversarialFlaggedView(ButtonView):
-    """View to handle whether flagged as adversarial. Should be automated in Milestone 3."""
+    """View to handle whether flagged as adversarial."""
 
     @discord.ui.button(label="No", style=discord.ButtonStyle.primary)
     async def risk_callback(self, interaction: discord.Interaction, button):
@@ -144,7 +147,7 @@ class IsAccurateView(ButtonView):
     @discord.ui.button(label="No", style=discord.ButtonStyle.secondary)
     async def not_accurate_callback(self, interaction: discord.Interaction, button):
         await self.change_buttons(interaction, button)
-        # TODO: automate this step.
+        # TODO: automate this step in Milestone 3.
         await interaction.followup.send(
             "Is this report flagged as possible adversarial activity?",
             view=AdversarialFlaggedView(self.review),
