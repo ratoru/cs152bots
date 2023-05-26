@@ -47,6 +47,7 @@ class ModBot(discord.Client):
         self.unreviewed_reports = []  # Priority queue storing unreviewed reports
         self.cur_review = None  # Review in progress
         self.strikes = defaultdict(int)  # Number of strikes per user
+        self.banned_users = set()
 
     async def on_ready(self):
         print(f"{self.user.name} has connected to Discord! It is these guilds:")
@@ -244,6 +245,9 @@ class ModBot(discord.Client):
         ]
         heapq.heapify(self.unreviewed_reports)
 
+    def is_banned(self, user):
+        return user in self.banned_users
+
     async def ban_user(self, user):
         # Explain violations and ban user
         embed = discord.Embed(
@@ -254,6 +258,7 @@ class ModBot(discord.Client):
         )
         embed.set_author(name="Community Moderators")
         await user.send(embed=embed)
+        self.banned_users.add(user)
         # Remove associated reports and messages
         await self.delete_associated_reports(user)
         await self.delete_messages(user)

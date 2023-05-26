@@ -68,6 +68,12 @@ class Report:
             if type(msg) == str:
                 return [msg]
 
+            if self.client.is_banned(msg.author):
+                return [
+                    "This user is already banned.",
+                    "Please provide a different message.",
+                ]
+
             # Here we've found the message - let's enter our View flow.
             self.state = State.IN_VIEW
             self.message = msg
