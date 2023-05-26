@@ -221,6 +221,10 @@ class ModBot(discord.Client):
         """
         self.strikes[user.id] += 1
         if self.strikes[user.id] >= self.STRIKE_LIMIT:
+            mod_channel = self.mod_channels[self.cur_review.report.message.guild.id]
+            await mod_channel.send(
+                f"This is the user's 3rd strike. He will be banned..."
+            )
             await self.ban_user(user)
         else:
             await self.suspend_user(user)
