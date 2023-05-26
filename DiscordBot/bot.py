@@ -235,6 +235,15 @@ class ModBot(discord.Client):
             f"{len(deleted)} messages from user {user.name} have been deleted."
         )
 
+    async def delete_associated_reports(self, user):
+        """Deletes all unreviewed reports that the user is involved in."""
+        self.unreviewed_reports = [
+            (score, report)
+            for (score, report) in self.unreviewed_reports
+            if report.message.author != user
+        ]
+        heapq.heapify(self.unreviewed_reports)
+
     async def ban_user(self, user):
         # Explain violations and ban user
         embed = discord.Embed(
@@ -244,11 +253,9 @@ class ModBot(discord.Client):
             url="https://discord.com/guidelines",
         )
         embed.set_author(name="Community Moderators")
-        # Uncomment for testing purposes
-        # channel = self.regular_channels[self.cur_review.report.message.guild.id]
-        # await channel.send(embed=embed)
         await user.send(embed=embed)
-        # Remove all their messages
+        # Remove associated reports and messages
+        await self.delete_associated_reports(user)
         await self.delete_messages(user)
 
     async def suspend_user(self, user):
