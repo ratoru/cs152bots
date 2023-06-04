@@ -301,6 +301,16 @@ class ModBot(discord.Client):
             )
             await mod_channel.send(embed=embed)
             self.cur_review = None
+            
+    async def notify_reporter(self, user):
+        # Notifies the reporter if the user they reported was punished
+        embed = discord.Embed(
+            title="Instant Feedback Report",
+            description=f"Your recent report was reviewed by our moderation team and the user in question has been issued a penalty. We take every report seriously and value your efforts towards keeping our community accountable.",
+            color=discord.Color.green(),
+        )
+        embed.set_author(name="Community Moderators")
+        await user.send(embed=embed)    
 
     def eval_text(self, message):
         """'
