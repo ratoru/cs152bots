@@ -142,7 +142,9 @@ class IsAccurateView(ButtonView):
             "Is the user(s) in immediate or actionable danger / risk of harm?",
             view=IsRiskView(self.review),
         )
-
+        reporter = self.review.report.author
+        await self.notify_reporter(reporter)
+        
     @discord.ui.button(label="No", style=discord.ButtonStyle.secondary)
     async def not_accurate_callback(self, interaction: discord.Interaction, button):
         await self.change_buttons(interaction, button)
