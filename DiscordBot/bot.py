@@ -7,6 +7,7 @@ import json
 import logging
 import re
 from report import Report
+from report import State
 from review import Review
 from collections import defaultdict
 import heapq
@@ -33,6 +34,7 @@ with open(token_path) as f:
 
 class ModBot(discord.Client):
     STRIKE_LIMIT = 3
+    AUTOREPORT_THRESHOLD = 0.95
 
     def __init__(self):
         intents = discord.Intents.default()
@@ -169,6 +171,18 @@ class ModBot(discord.Client):
         )
         scores = self.eval_text(message.content)
         await mod_channel.send(self.code_format(message.content,scores))
+        #Sets up the autoreport
+        #TODO: correctly set up the state f
+        if scores > self.AUTOREPORT_THRESHOLD:
+            autoreport = Report(self)
+            autoreport.author = self.user
+            autoreport.message = message
+            autoreport.score = scores
+            autoreport.state = State.REPORT_COMPLETE
+            self.push_report(scores, autoreport)
+            await mod_channel.send(
+                f"There are {len(self.unreviewed_reports)} reports outstanding."
+            )
 
     async def handle_mod_channel_message(self, message):
         # Handle a help message
@@ -312,13 +326,14 @@ class ModBot(discord.Client):
             
     async def notify_reporter(self, user):
         # Notifies the reporter if the user they reported was punished
-        embed = discord.Embed(
-            title="Instant Feedback Report",
-            description=f"Your recent report was reviewed by our moderation team and the user in question has been issued a penalty. We take every report seriously and value your efforts towards keeping our community accountable.",
-            color=discord.Color.green(),
-        )
-        embed.set_author(name="Community Moderators")
-        await user.send(embed=embed)    
+        if user != self.user:
+            embed = discord.Embed(
+                title="Instant Feedback Report",
+                description=f"Your recent report was reviewed by our moderation team and the user in question has been issued a penalty. We take every report seriously and value your efforts towards keeping our community accountable.",
+                color=discord.Color.green(),
+            )
+            embed.set_author(name="Community Moderators")
+            await user.send(embed=embed)    
 
     def eval_text(self, message) -> float:
         """'
