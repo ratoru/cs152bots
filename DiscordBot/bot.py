@@ -10,6 +10,7 @@ from report import Report
 from review import Review
 from collections import defaultdict
 import heapq
+import perspective
 
 # Set up logging to the console
 logger = logging.getLogger("discord")
@@ -138,7 +139,14 @@ class ModBot(discord.Client):
             return
         # Evaluate completed report and add to review queue
         if self.unfinished_reports[author_id].report_complete():
-            score = 1  # TODO: replace with acutal score in Milestone 3
+            messages = self.unfinished_reports[author_id].additional_msgs
+            messages += [self.unfinished_reports[author_id].message]
+            score = -1
+            for message in messages:
+                eval = perspective.analyze_text(message.content)
+                if eval > score:
+                    score = eval
+            self.unfinished_reports[author_id].set_score(score)
             cur_report = self.unfinished_reports[author_id]
             self.push_report(score, cur_report)
             mod_channel = self.mod_channels[cur_report.message.guild.id]
@@ -160,7 +168,7 @@ class ModBot(discord.Client):
             f'Forwarded message:\n{message.author.name}: "{message.content}"'
         )
         scores = self.eval_text(message.content)
-        await mod_channel.send(self.code_format(scores))
+        await mod_channel.send(self.code_format(message.content,scores))
 
     async def handle_mod_channel_message(self, message):
         # Handle a help message
@@ -312,20 +320,20 @@ class ModBot(discord.Client):
         embed.set_author(name="Community Moderators")
         await user.send(embed=embed)    
 
-    def eval_text(self, message):
+    def eval_text(self, message) -> float:
         """'
         TODO: Once you know how you want to evaluate messages in your channel,
         insert your code here! This will primarily be used in Milestone 3.
         """
-        return message
+        return perspective.analyze_text(message)
 
-    def code_format(self, text):
+    def code_format(self, text, score):
         """'
         TODO: Once you know how you want to show that a message has been
         evaluated, insert your code here for formatting the string to be
         shown in the mod channel.
         """
-        return "Evaluated: '" + text + "'"
+        return "Evaluated: '" + text + "'" + " with concern score of: " + str(score)
 
 
 client = ModBot()

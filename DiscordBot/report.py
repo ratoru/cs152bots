@@ -42,6 +42,7 @@ class Report:
         self.date_submitted = None
         self.additional_msgs: List[discord.Message] = []
         self.additional_info: Optional[str] = None
+        self.score = None
 
     async def handle_message(self, message):
         """
@@ -158,7 +159,8 @@ class Report:
             + f"Harassment Types: {self.harassment_types}\n"
             + f"Target of the abuse: {self.target} \n"
             + f"Additional Msgs: {self.format_extra_msgs()}\n"
-            + f"Additional Info: {self.additional_info}"
+            + f"Additional Info: {self.additional_info}\n"
+            + f"Concern Score: {self.score}"
         )
 
     async def finish_report(self):
@@ -182,6 +184,9 @@ class Report:
 
     def set_target(self, target):
         self.target = target
+
+    def set_score(self, score):
+        self.score = score
 
     # Sorting functions for the class
     def _is_valid_operand(self, other):
