@@ -14,13 +14,13 @@ with open(token_path) as f:
 
 
 # These are the attributes that will be checked by the API.
-# TODO: Thresholds do nothing rn.
-attributeThresholds = {
-    "TOXICITY": 0.75,
-    "SEVERE_TOXICITY": 0.75,
-    "IDENTITY_ATTACK": 0.75,
-    "INSULT": 0.75,
-    "THREAT": 0.75,
+# This is the format the API expects.
+requestedAttributes = {
+    "TOXICITY": {},
+    "SEVERE_TOXICITY": {},
+    "IDENTITY_ATTACK": {},
+    "INSULT": {},
+    "THREAT": {},
 }
 
 
@@ -33,11 +33,6 @@ def analyze_text(text: str) -> float:
     Returns:
         float: the probability the string is harassment
     """
-    # This is the format the API expects
-    requestedAttributes = {}
-    for attribute in attributeThresholds:
-        requestedAttributes[attribute] = {}
-
     # Open socket for request
     with discovery.build(
         "commentanalyzer",
@@ -63,7 +58,7 @@ def analyze_scores(response) -> float:
         highest probability in the response
     """
     probability = 0
-    for attribute in attributeThresholds:
+    for attribute in requestedAttributes:
         attribute_probability = response["attributeScores"][attribute]["summaryScore"][
             "value"
         ]

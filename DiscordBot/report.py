@@ -155,12 +155,16 @@ class Report:
         return (
             f"User {self.author.name} reported the following message on {self.date_submitted}:\n"
             + f"```{self.message.author.name}: {self.message.content}```\n"
+            + "-------- Report Info --------\n"
             + f"Abuse Type: {self.abuse_type}\n"
             + f"Harassment Types: {self.harassment_types}\n"
             + f"Target of the abuse: {self.target} \n"
             + f"Additional Msgs: {self.format_extra_msgs()}\n"
             + f"Additional Info: {self.additional_info}\n"
-            + f"Concern Score: {self.score}"
+            + f"Concern Score: {self.score}\n"
+            + f"Average concern score of message author: {self.client.statistics.get_average_sentiment_score(self.message.author.id)}%\n"
+            + "-------- Reporter Info --------\n"
+            + f"Average report accuracy: {self.client.statistics.get_average_report_accuracy(self.author.id)}%"
         )
 
     async def finish_report(self):

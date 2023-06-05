@@ -58,26 +58,26 @@ class Review:
     def report_popped(self):
         return self.report is not None
 
-    def explain_review(self, action: Literal["suspend", "ban"]):
-        """Explains why action against the user has been taken."""
-        ban_msg = "Refer to the linked Community Guidelines for more information."
-        if action == "suspend":
-            ban_msg = (
-                "After two suspension any further violations will get your account banned.\n"
-                + ban_msg
-            )
-        if self.adversarial:
-            return (
-                "You have violated our Community Guidelines by targeting a user with wrong reports.\n"
-                + f"We do not tolerate this behavior, so we were forced to {action} your account.\n"
-                + ban_msg
-            )
-        return (
-            "Your recent messages have violated our Community Guidelines:\n"
-            + f"```{self.report.message.content}```"
-            + f"We do not tolerate this behavior, so we were forced to {action} your account.\n"
-            + ban_msg
-        )
+    # def explain_review(self, action: Literal["suspend", "ban"]):
+    #     """Explains why action against the user has been taken."""
+    #     ban_msg = "Refer to the linked Community Guidelines for more information."
+    #     if action == "suspend":
+    #         ban_msg = (
+    #             "After two suspension any further violations will get your account banned.\n"
+    #             + ban_msg
+    #         )
+    #     if self.adversarial:
+    #         return (
+    #             "You have violated our Community Guidelines by targeting a user with wrong reports.\n"
+    #             + f"We do not tolerate this behavior, so we were forced to {action} your account.\n"
+    #             + ban_msg
+    #         )
+    #     return (
+    #         "Your recent messages have violated our Community Guidelines:\n"
+    #         + f"```{self.report.message.content}```"
+    #         + f"We do not tolerate this behavior, so we were forced to {action} your account.\n"
+    #         + ban_msg
+    #     )
 
     async def finish_review(self):
         """Finishes the report by setting the type to complete and calling the client's clean up funciton."""

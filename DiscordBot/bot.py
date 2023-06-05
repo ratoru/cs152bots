@@ -9,9 +9,10 @@ import re
 from report import Report
 from report import State
 from review import Review
-from collections import defaultdict
+from statistics import Statistics
 import heapq
 import perspective
+from typing import Literal
 
 # Set up logging to the console
 logger = logging.getLogger("discord")
@@ -34,7 +35,9 @@ with open(token_path) as f:
 
 class ModBot(discord.Client):
     STRIKE_LIMIT = 3
-    AUTOREPORT_THRESHOLD = 0.95
+    AUTOREPORT_THRESHOLD = 0.70
+    AUTOSUSPEND_THRESHOLD = 0.80
+    AUTOBAN_THRESHOLD = 0.95
 
     def __init__(self):
         intents = discord.Intents.default()
@@ -44,13 +47,13 @@ class ModBot(discord.Client):
         )
         super().__init__(command_prefix=".", intents=intents)
         self.group_num = None
-        self.mod_channels = {}  # Map from guild to the mod channel id for that guild
-        self.regular_channels = {}  # Map from guild to the regular channel id
+        self.mod_channel: discord.TextChannel = None  # Mod channel id for that guild
+        self.regular_channel: discord.TextChannel = None  # Regular channel id
         self.unfinished_reports = {}  # Map from user IDs to the state of their report
         self.unreviewed_reports = []  # Priority queue storing unreviewed reports
         self.cur_review = None  # Review in progress
-        self.strikes = defaultdict(int)  # Number of strikes per user
         self.banned_users = set()
+        self.statistics = Statistics()
 
     async def on_ready(self):
         print(f"{self.user.name} has connected to Discord! It is these guilds:")
@@ -71,9 +74,9 @@ class ModBot(discord.Client):
         for guild in self.guilds:
             for channel in guild.text_channels:
                 if channel.name == f"group-{self.group_num}-mod":
-                    self.mod_channels[guild.id] = channel
+                    self.mod_channel = channel
                 if channel.name == f"group-{self.group_num}":
-                    self.regular_channels[guild.id] = channel
+                    self.regular_channel = channel
 
     async def on_message(self, message):
         """
@@ -151,8 +154,7 @@ class ModBot(discord.Client):
             self.unfinished_reports[author_id].set_score(score)
             cur_report = self.unfinished_reports[author_id]
             self.push_report(score, cur_report)
-            mod_channel = self.mod_channels[cur_report.message.guild.id]
-            await mod_channel.send(
+            await self.mod_channel.send(
                 f"There are {len(self.unreviewed_reports)} reports outstanding."
             )
         # Remove report from internal map.
@@ -163,24 +165,29 @@ class ModBot(discord.Client):
             self.unfinished_reports.pop(author_id)
 
     async def handle_normal_channel_message(self, message):
-        # Forward the message to the mod channel
-        # TODO: Milestone 3 we probably want to run our classifier and create reports for important cases.
-        mod_channel = self.mod_channels[message.guild.id]
-        await mod_channel.send(
+        """Runs our classifier against the message and updates all statistics accordingly.
+        Will ban users for extremely hateful comments.
+        """
+        await self.mod_channel.send(
             f'Forwarded message:\n{message.author.name}: "{message.content}"'
         )
-        scores = self.eval_text(message.content)
-        await mod_channel.send(self.code_format(message.content,scores))
-        #Sets up the autoreport
-        #TODO: correctly set up the state f
-        if scores > self.AUTOREPORT_THRESHOLD:
+        score = self.eval_text(message.content)
+        await self.mod_channel.send(self.code_format(message.content, score))
+        # Sets up the autoreport
+        self.statistics.add_sentiment(message.author.id, score)
+        if score > self.AUTOBAN_THRESHOLD:
+            await self.ban_user(message.author, message.content, False)
+        elif score > self.AUTOSUSPEND_THRESHOLD:
+            await self.enforce_strike(message.author, message.content, False)
+        elif score > self.AUTOREPORT_THRESHOLD:
             autoreport = Report(self)
+            autoreport.abuse_type = "Bullying or harrasment"
             autoreport.author = self.user
             autoreport.message = message
-            autoreport.score = scores
+            autoreport.score = score
             autoreport.state = State.REPORT_COMPLETE
-            self.push_report(scores, autoreport)
-            await mod_channel.send(
+            self.push_report(score, autoreport)
+            await self.mod_channel.send(
                 f"There are {len(self.unreviewed_reports)} reports outstanding."
             )
 
@@ -236,29 +243,35 @@ class ModBot(discord.Client):
     def push_report(self, score, report):
         heapq.heappush(self.unreviewed_reports, (-score, report))
 
-    async def enforce_strike(self, user) -> bool:
+    async def enforce_strike(
+        self, user, message_content: str, adversarial: bool
+    ) -> bool:
         """
         Adds a strike to the user's account.
         If the user has STRIKE_LIMIT strikes, the user will be banned. Otherwise, the user will be suspended.
         """
-        self.strikes[user.id] += 1
-        if self.strikes[user.id] >= self.STRIKE_LIMIT:
-            mod_channel = self.mod_channels[self.cur_review.report.message.guild.id]
-            await mod_channel.send(
-                f"This is the user's 3rd strike. He will be banned..."
+        if self.statistics.add_and_check_strike(user.id, self.STRIKE_LIMIT):
+            await self.mod_channel.send(
+                f"This is the user's 3rd strike. They will be banned..."
             )
-            await self.ban_user(user)
+            await self.ban_user(
+                user,
+                message_content,
+                adversarial,
+            )
         else:
-            await self.suspend_user(user)
+            await self.suspend_user(
+                user,
+                message_content,
+                adversarial,
+            )
 
     async def delete_messages(self, user):
         """Deletes all messages from user `user_id`."""
-        channel = self.regular_channels[self.cur_review.report.message.guild.id]
-        mod_channel = self.mod_channels[self.cur_review.report.message.guild.id]
-        deleted = await channel.purge(
+        deleted = await self.regular_channel.purge(
             check=lambda m: m.author == user, reason="Account Banned"
         )
-        await mod_channel.send(
+        await self.mod_channel.send(
             f"{len(deleted)} messages from user {user.name} have been deleted."
         )
 
@@ -274,11 +287,40 @@ class ModBot(discord.Client):
     def is_banned(self, user):
         return user in self.banned_users
 
-    async def ban_user(self, user):
+    def explain_review(
+        self,
+        message_content: str,
+        adversarial: bool,
+        action: Literal["suspend", "ban"],
+        user,
+    ):
+        """Explains why action against the user has been taken."""
+        ban_msg = "Refer to the linked Community Guidelines for more information."
+        if action == "suspend":
+            ban_msg = (
+                "After "
+                + str(self.STRIKE_LIMIT - self.statistics.get_strikes(user.id))
+                + " suspension(s) any further violations will get your account banned.\n"
+                + ban_msg
+            )
+        if adversarial:
+            return (
+                "You have violated our Community Guidelines by targeting a user with wrong reports.\n"
+                + f"We do not tolerate this behavior, so we were forced to {action} your account.\n"
+                + ban_msg
+            )
+        return (
+            "Your recent messages have violated our Community Guidelines:\n"
+            + f"```{message_content}```"
+            + f"We do not tolerate this behavior, so we were forced to {action} your account.\n"
+            + ban_msg
+        )
+
+    async def ban_user(self, user, message_content: str, adversarial: bool):
         # Explain violations and ban user
         embed = discord.Embed(
             title="Your account has been banned!",
-            description=self.cur_review.explain_review("ban"),
+            description=self.explain_review(message_content, adversarial, "ban", user),
             color=discord.Color.red(),
             url="https://discord.com/guidelines",
         )
@@ -289,18 +331,17 @@ class ModBot(discord.Client):
         await self.delete_associated_reports(user)
         await self.delete_messages(user)
 
-    async def suspend_user(self, user):
+    async def suspend_user(self, user, message_content: str, adversarial: bool):
         # Warn the user with explanation and suspend for 7 days
         embed = discord.Embed(
             title="Your account has been suspended for 7 days!",
-            description=self.cur_review.explain_review("suspend"),
+            description=self.explain_review(
+                message_content, adversarial, "suspend", user
+            ),
             color=discord.Color.orange(),
             url="https://discord.com/guidelines",
         )
         embed.set_author(name="Community Moderators")
-        # Uncomment for testing purposes
-        # channel = self.regular_channels[self.cur_review.report.message.guild.id]
-        # await channel.send(embed=embed)
         await user.send(embed=embed)
 
     async def clean_up_review(self):
@@ -314,16 +355,14 @@ class ModBot(discord.Client):
             return
 
         if self.cur_review.review_complete():
-            guild_id = self.cur_review.report.message.guild.id
-            mod_channel = self.mod_channels[guild_id]
             embed = discord.Embed(
                 title="Review completed!",
                 description=f"Thank you for reviewing this report. Necessary actions have been taken.\nThere are now {len(self.unreviewed_reports)} reports outstanding.",
                 color=discord.Color.green(),
             )
-            await mod_channel.send(embed=embed)
+            await self.mod_channel.send(embed=embed)
             self.cur_review = None
-            
+
     async def notify_reporter(self, user):
         # Notifies the reporter if the user they reported was punished
         if user != self.user:
@@ -333,7 +372,7 @@ class ModBot(discord.Client):
                 color=discord.Color.green(),
             )
             embed.set_author(name="Community Moderators")
-            await user.send(embed=embed)    
+            await user.send(embed=embed)
 
     def eval_text(self, message) -> float:
         """'

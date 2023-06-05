@@ -41,7 +41,9 @@ class MassReportingView(ButtonView):
         await self.change_buttons(interaction, button)
         # The author of the report should get punished
         bully = self.review.report.author
-        await self.review.client.enforce_strike(bully)
+        await self.review.client.enforce_strike(
+            bully, self.review.report.message.content, self.review.adversarial
+        )
         await self.review.finish_review()
 
     @discord.ui.button(label="Yes", style=discord.ButtonStyle.secondary)
@@ -52,7 +54,9 @@ class MassReportingView(ButtonView):
         )
         # The author of the report should get punished
         bully = self.review.report.author
-        await self.review.client.enforce_strike(bully)
+        await self.review.client.enforce_strike(
+            bully, self.review.report.message.content, self.review.adversarial
+        )
         await self.review.finish_review()
 
 
@@ -98,14 +102,24 @@ class TypeOfViolationView(ButtonView):
     async def risk_callback(self, interaction: discord.Interaction, button):
         await self.change_buttons(interaction, button)
         bully = self.review.report.message.author
-        await self.review.client.ban_user(bully)
+        await self.review.client.ban_user(
+            bully, self.review.report.message.content, self.review.adversarial
+        )
+        self.review.client.statistics.increment_successful_reports(
+            self.review.report.author.id
+        )
         await self.review.finish_review()
 
     @discord.ui.button(label="No", style=discord.ButtonStyle.secondary)
     async def no_risk_callback(self, interaction: discord.Interaction, button):
         await self.change_buttons(interaction, button)
         bully = self.review.report.message.author
-        await self.review.client.enforce_strike(bully)
+        await self.review.client.enforce_strike(
+            bully, self.review.report.message.content, self.review.adversarial
+        )
+        self.review.client.statistics.increment_successful_reports(
+            self.review.report.author.id
+        )
         await self.review.finish_review()
 
 
@@ -120,7 +134,9 @@ class IsRiskView(ButtonView):
             + "For now, I will ban the user for you..."
         )
         bully = self.review.report.message.author
-        await self.review.client.ban_user(bully)
+        await self.review.client.ban_user(
+            bully, self.review.report.message.content, self.review.adversarial
+        )
         await self.review.finish_review()
 
     @discord.ui.button(label="No", style=discord.ButtonStyle.secondary)
@@ -144,7 +160,7 @@ class IsAccurateView(ButtonView):
         )
         reporter = self.review.report.author
         await self.review.client.notify_reporter(reporter)
-        
+
     @discord.ui.button(label="No", style=discord.ButtonStyle.secondary)
     async def not_accurate_callback(self, interaction: discord.Interaction, button):
         await self.change_buttons(interaction, button)
