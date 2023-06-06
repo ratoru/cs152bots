@@ -38,6 +38,7 @@ class ModBot(discord.Client):
     AUTOREPORT_THRESHOLD = 0.70
     AUTOSUSPEND_THRESHOLD = 0.80
     AUTOBAN_THRESHOLD = 0.95
+    PERFORMANCE_KEYWORD = "performance"
 
     def __init__(self):
         intents = discord.Intents.default()
@@ -142,18 +143,10 @@ class ModBot(discord.Client):
         """
         if author_id not in self.unfinished_reports:
             return
-        # Evaluate completed report and add to review queue
+        # Add completed report to review queue
         if self.unfinished_reports[author_id].report_complete():
-            messages = self.unfinished_reports[author_id].additional_msgs
-            messages += [self.unfinished_reports[author_id].message]
-            score = -1
-            for message in messages:
-                eval = perspective.analyze_text(message.content)
-                if eval > score:
-                    score = eval
-            self.unfinished_reports[author_id].set_score(score)
             cur_report = self.unfinished_reports[author_id]
-            self.push_report(score, cur_report)
+            self.push_report(cur_report.score, cur_report)
             await self.mod_channel.send(
                 f"There are {len(self.unreviewed_reports)} reports outstanding."
             )
@@ -196,6 +189,13 @@ class ModBot(discord.Client):
         if message.content == Review.HELP_KEYWORD:
             reply = "Use the `review` command to begin the reviewing process.\n"
             reply += "Use the `cancel` command to cancel the reviewing process.\n"
+            reply += "Use the `performance` command to review the accuracy of the API."
+            await message.channel.send(reply)
+            return
+
+        # Handle checking on the API performance
+        if message.content == self.PERFORMANCE_KEYWORD:
+            reply = self.statistics.api_statistics_overview()
             await message.channel.send(reply)
             return
 

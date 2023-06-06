@@ -44,7 +44,7 @@ class MassReportingView(ButtonView):
         await self.review.client.enforce_strike(
             bully, self.review.report.message.content, self.review.adversarial
         )
-        await self.review.finish_review()
+        await self.review.finish_review(True)
 
     @discord.ui.button(label="Yes", style=discord.ButtonStyle.secondary)
     async def no_risk_callback(self, interaction: discord.Interaction, button):
@@ -57,7 +57,7 @@ class MassReportingView(ButtonView):
         await self.review.client.enforce_strike(
             bully, self.review.report.message.content, self.review.adversarial
         )
-        await self.review.finish_review()
+        await self.review.finish_review(True)
 
 
 class AdversarialView(ButtonView):
@@ -66,7 +66,7 @@ class AdversarialView(ButtonView):
     @discord.ui.button(label="No", style=discord.ButtonStyle.primary)
     async def risk_callback(self, interaction: discord.Interaction, button):
         await self.change_buttons(interaction, button)
-        await self.review.finish_review()
+        await self.review.finish_review(False)
 
     @discord.ui.button(label="Yes", style=discord.ButtonStyle.secondary)
     async def no_risk_callback(self, interaction: discord.Interaction, button):
@@ -84,7 +84,7 @@ class AdversarialFlaggedView(ButtonView):
     @discord.ui.button(label="No", style=discord.ButtonStyle.primary)
     async def risk_callback(self, interaction: discord.Interaction, button):
         await self.change_buttons(interaction, button)
-        await self.review.finish_review()
+        await self.review.finish_review(False)
 
     @discord.ui.button(label="Yes", style=discord.ButtonStyle.secondary)
     async def no_risk_callback(self, interaction: discord.Interaction, button):
@@ -105,10 +105,7 @@ class TypeOfViolationView(ButtonView):
         await self.review.client.ban_user(
             bully, self.review.report.message.content, self.review.adversarial
         )
-        self.review.client.statistics.increment_successful_reports(
-            self.review.report.author.id
-        )
-        await self.review.finish_review()
+        await self.review.finish_review(True)
 
     @discord.ui.button(label="No", style=discord.ButtonStyle.secondary)
     async def no_risk_callback(self, interaction: discord.Interaction, button):
@@ -117,10 +114,7 @@ class TypeOfViolationView(ButtonView):
         await self.review.client.enforce_strike(
             bully, self.review.report.message.content, self.review.adversarial
         )
-        self.review.client.statistics.increment_successful_reports(
-            self.review.report.author.id
-        )
-        await self.review.finish_review()
+        await self.review.finish_review(True)
 
 
 class IsRiskView(ButtonView):
@@ -137,7 +131,7 @@ class IsRiskView(ButtonView):
         await self.review.client.ban_user(
             bully, self.review.report.message.content, self.review.adversarial
         )
-        await self.review.finish_review()
+        await self.review.finish_review(True)
 
     @discord.ui.button(label="No", style=discord.ButtonStyle.secondary)
     async def no_risk_callback(self, interaction: discord.Interaction, button):

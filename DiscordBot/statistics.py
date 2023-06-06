@@ -1,4 +1,16 @@
 from collections import defaultdict
+import random
+
+
+class APIStatistics:
+    def __init__(self) -> None:
+        self.total_reports = 0
+        self.successful_reports = 0
+
+    def average_success_rate(self) -> float:
+        if self.total_reports == 0:
+            return 0
+        return round(self.successful_reports / self.total_reports * 100, 2)
 
 
 class UserStatistics:
@@ -28,10 +40,14 @@ class UserStatistics:
 class Statistics:
     """Keeps track of all statistics needed for the bot."""
 
+    PERCENTAGE_RANGE = 5  # how fine grained the api statistics are
+
     def __init__(self):
         # TODO: load dict from SQLite
         self.user_statistics = defaultdict(UserStatistics)
+        self.api_statistics = defaultdict(APIStatistics)
 
+    # -------- User Statistics --------
     def add_and_check_strike(self, user_id: int, limit: int) -> bool:
         """Adds a strike to the user and returns whether the user has more strikes than the limit."""
         self.user_statistics[user_id].strikes += 1
@@ -62,11 +78,35 @@ class Statistics:
         self.user_statistics[user_id].sentiment_total += score
         self.user_statistics[user_id].num_messages_sent += 1
 
+    # -------- API Statistics --------
+    def add_report(self, score: float, successful: bool):
+        """Adds a (successful) report to the statistics of the API."""
+        # Convert score into next multiple of PERCENT_RANGE
+        rounded_score = (
+            (round(score * 100) // self.PERCENTAGE_RANGE) + 1
+        ) * self.PERCENTAGE_RANGE
+        self.api_statistics[rounded_score].total_reports += 1
+        if successful:
+            self.api_statistics[rounded_score].successful_reports += 1
 
-# if __name__ == "__main__":
-#     stats = Statistics()
-#     for i in range(4):
-#         print(stats.add_strike(0, 3))
-#         print(stats.get_strikes(0))
-# On a bot basis:
-# - I was thinking of splitting probabilities into ranges (e.g. every 5% is an entry in a dict) and keeping track of how successful these reports are
+    def api_statistics_overview(self) -> str:
+        overview = "How often do sentiment scores in the following ranges lead to succesful reports?\n```"
+        for i in range(100 // self.PERCENTAGE_RANGE):
+            upper_bound = (i + 1) * self.PERCENTAGE_RANGE
+            success_rate = self.api_statistics[upper_bound].average_success_rate()
+            overview += "\n{:>2d}-{:>3d}%:".format(
+                i * self.PERCENTAGE_RANGE, upper_bound
+            )
+            overview += "{:>6s}".format(
+                f"{self.api_statistics[upper_bound].successful_reports}/{self.api_statistics[upper_bound].total_reports}"
+            )
+            overview += "   " + "∎" * (int(success_rate) // 10)
+        overview += "\n```"
+        return overview
+
+
+if __name__ == "__main__":
+    stats = Statistics()
+    for i in range(100):
+        stats.add_report(random.random(), random.choice([True, False]))
+    print(stats.api_statistics_overview())

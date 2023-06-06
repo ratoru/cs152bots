@@ -9,6 +9,7 @@ from report_views import (
 )
 from typing import Optional, List, Union
 from datetime import date
+import perspective
 
 
 class State(Enum):
@@ -42,7 +43,7 @@ class Report:
         self.date_submitted = None
         self.additional_msgs: List[discord.Message] = []
         self.additional_info: Optional[str] = None
-        self.score = None
+        self.score: float = 0
 
     async def handle_message(self, message):
         """
@@ -171,6 +172,14 @@ class Report:
         """Finishes the report by setting the type to complete and calling the client's clean up funciton."""
         self.state = State.REPORT_COMPLETE
         self.date_submitted = date.today()
+        self.client.statistics.increment_reports_against(self.message.author.id)
+        self.client.statistics.increment_reports_sent(self.author.id)
+        score = perspective.analyze_text(self.message.content)
+        for msg in self.additional_msgs:
+            eval = perspective.analyze_text(msg.content)
+            if eval > score:
+                score = eval
+        self.score = score
         await self.client.clean_up_report(self.author.id)
 
     # State setters and getters

@@ -10,4 +10,5 @@ This is the base framework for students to complete Milestone 2 of the CS 152 fi
 
 - Multiple languages supported
 - Detailed statistics on users
+- Detailed statistics on the predictive power of the API
 - Intuitive report and review flows using `discord.ui`

@@ -1,6 +1,5 @@
 from enum import Enum, auto
 from review_views import ReviewStart
-from typing import Literal
 
 
 class State(Enum):
@@ -58,30 +57,13 @@ class Review:
     def report_popped(self):
         return self.report is not None
 
-    # def explain_review(self, action: Literal["suspend", "ban"]):
-    #     """Explains why action against the user has been taken."""
-    #     ban_msg = "Refer to the linked Community Guidelines for more information."
-    #     if action == "suspend":
-    #         ban_msg = (
-    #             "After two suspension any further violations will get your account banned.\n"
-    #             + ban_msg
-    #         )
-    #     if self.adversarial:
-    #         return (
-    #             "You have violated our Community Guidelines by targeting a user with wrong reports.\n"
-    #             + f"We do not tolerate this behavior, so we were forced to {action} your account.\n"
-    #             + ban_msg
-    #         )
-    #     return (
-    #         "Your recent messages have violated our Community Guidelines:\n"
-    #         + f"```{self.report.message.content}```"
-    #         + f"We do not tolerate this behavior, so we were forced to {action} your account.\n"
-    #         + ban_msg
-    #     )
-
-    async def finish_review(self):
+    async def finish_review(self, take_action: bool):
         """Finishes the report by setting the type to complete and calling the client's clean up funciton."""
         self.state = State.REVIEW_COMPLETE
+        # Record statistics
+        self.client.statistics.add_report(self.report.score, take_action)
+        if take_action:
+            self.client.statistics.increment_successful_reports(self.report.author.id)
         await self.client.clean_up_review()
 
     # State setters and getters
