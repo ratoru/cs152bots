@@ -44,8 +44,10 @@ class Statistics:
 
     def __init__(self):
         # TODO: load dict from SQLite
-        self.user_statistics = defaultdict(UserStatistics)
-        self.api_statistics = defaultdict(APIStatistics)
+        self.user_statistics = defaultdict(UserStatistics)  # per user statistics
+        self.api_statistics = defaultdict(
+            APIStatistics
+        )  # how effective the API is in predicting reports
 
     # -------- User Statistics --------
     def add_and_check_strike(self, user_id: int, limit: int) -> bool:
