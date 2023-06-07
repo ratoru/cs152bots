@@ -1,7 +1,6 @@
 # bot.py
 import discord
 from discord.ext import commands
-from discord import ui
 import os
 import json
 import logging
@@ -161,11 +160,7 @@ class ModBot(discord.Client):
         """Runs our classifier against the message and updates all statistics accordingly.
         Will ban users for extremely hateful comments.
         """
-        # await self.mod_channel.send(
-        #     f'Forwarded message:\n{message.author.name}: "{message.content}"'
-        # )
         score = perspective.analyze_text(message.content)
-        # await self.mod_channel.send(self.code_format(message.content, score))
         # Sets up the autoreport
         self.statistics.add_sentiment(message.author.id, score)
         if score > self.AUTOBAN_THRESHOLD:
@@ -379,21 +374,6 @@ class ModBot(discord.Client):
             )
             embed.set_author(name="Community Moderators")
             await user.send(embed=embed)
-
-    # def eval_text(self, message) -> float:
-    #     """'
-    #     TODO: Once you know how you want to evaluate messages in your channel,
-    #     insert your code here! This will primarily be used in Milestone 3.
-    #     """
-    #     return perspective.analyze_text(message)
-
-    # def code_format(self, text, score):
-    #     """'
-    #     TODO: Once you know how you want to show that a message has been
-    #     evaluated, insert your code here for formatting the string to be
-    #     shown in the mod channel.
-    #     """
-    #     return "Evaluated: '" + text + "'" + " with concern score of: " + str(score)
 
 
 client = ModBot()
