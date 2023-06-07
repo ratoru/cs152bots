@@ -92,7 +92,7 @@ class Statistics:
             self.api_statistics[rounded_score].successful_reports += 1
 
     def api_statistics_overview(self) -> str:
-        overview = "How often do concern scores in the following ranges lead to succesful reports?\n```"
+        overview = "How often do concern scores in the following ranges lead to successful reports?\n```"
         for i in range(100 // self.PERCENTAGE_RANGE):
             upper_bound = (i + 1) * self.PERCENTAGE_RANGE
             success_rate = self.api_statistics[upper_bound].average_success_rate()
