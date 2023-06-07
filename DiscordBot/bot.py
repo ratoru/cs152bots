@@ -35,8 +35,8 @@ with open(token_path) as f:
 
 class ModBot(discord.Client):
     STRIKE_LIMIT = 3
-    AUTOREPORT_THRESHOLD = 0.70
-    AUTOSUSPEND_THRESHOLD = 0.80
+    AUTOREPORT_THRESHOLD = 0.7
+    AUTOSUSPEND_THRESHOLD = 0.8
     AUTOBAN_THRESHOLD = 0.95
     PERFORMANCE_KEYWORD = "performance"
 

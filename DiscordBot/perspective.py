@@ -1,4 +1,5 @@
 from googleapiclient import discovery
+from unidecode import unidecode
 import json
 import os
 
@@ -33,6 +34,10 @@ def analyze_text(text: str) -> float:
     Returns:
         float: the probability the string is harassment
     """
+    # Convert Unicode characters to ascii characters.
+    # This aims to prevent adversarial unicode texts.
+    ascii_text = unidecode(text)
+
     # Open socket for request
     with discovery.build(
         "commentanalyzer",
@@ -42,7 +47,7 @@ def analyze_text(text: str) -> float:
         static_discovery=False,
     ) as client:
         analyze_request = {
-            "comment": {"text": text},
+            "comment": {"text": ascii_text},
             "requestedAttributes": requestedAttributes,
         }
         response = client.comments().analyze(body=analyze_request).execute()

@@ -18,5 +18,6 @@ This is the base framework for students to complete Milestone 2 of the CS 152 fi
 - Strike system with temporary suspensions.
 - User feedback during reports and if report successful.
 - Safeguards:
+  - Converts unicode characters to ascii before evaluating the message.
   - Cannot report banned users.
   - All reports against a user get deleted once they're banned.
