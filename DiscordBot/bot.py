@@ -1,6 +1,6 @@
 # bot.py
 import discord
-from discord.ext import commands
+from datetime import date
 import os
 import json
 import logging
@@ -38,6 +38,7 @@ class ModBot(discord.Client):
     AUTOSUSPEND_THRESHOLD = 0.8
     AUTOBAN_THRESHOLD = 0.95
     PERFORMANCE_KEYWORD = "performance"
+    # PURGE_KEYWORD = "clear"
 
     def __init__(self):
         intents = discord.Intents.default()
@@ -160,6 +161,10 @@ class ModBot(discord.Client):
         """Runs our classifier against the message and updates all statistics accordingly.
         Will ban users for extremely hateful comments.
         """
+        # if message.content == self.PURGE_KEYWORD:
+        #     await self.regular_channel.purge(reason="Clearing messages for video.")
+        #     return
+
         score = perspective.analyze_text(message.content)
         # Sets up the autoreport
         self.statistics.add_sentiment(message.author.id, score)
@@ -180,6 +185,7 @@ class ModBot(discord.Client):
             autoreport.message = message
             autoreport.score = score
             autoreport.state = State.REPORT_COMPLETE
+            autoreport.date_submitted = date.today()
             self.push_report(score, autoreport)
             await self.mod_channel.send(
                 f"There are {len(self.unreviewed_reports)} reports outstanding."
@@ -199,6 +205,13 @@ class ModBot(discord.Client):
             reply = self.statistics.api_statistics_overview()
             await message.channel.send(reply)
             return
+
+        # # Purges all messages in the mod channel
+        # if message.content == self.PURGE_KEYWORD:
+        #     await self.mod_channel.purge(
+        #         limit=None, reason="Clearing messsages for video."
+        #     )
+        #     return
 
         # Only respond to messages if they're part of a review flow
         if self.cur_review is None and not message.content.startswith(
